@@ -1,27 +1,25 @@
-import type { Metadata } from "next"
-import Link from "next/link"
-import { GraduationCap } from "lucide-react"
+"use client"
 
-import { Button } from "@/components/ui/button"
+import { SiteHeader } from "@/components/site-header"
+import { HeroSection } from "@/components/hero-section"
+import { FeaturesSection } from "@/components/features-section"
+import { TestimonialsSection } from "@/components/testimonials-section"
+import { FaqSection } from "@/components/faq-section"
+import { CtaSection } from "@/components/cta-section"
+import { SiteFooter } from "@/components/site-footer"
 
-export const metadata: Metadata = {
-  title: "Campus Care",
-  description: "A comprehensive platform for students to manage their academic journey.",
-}
-
-export default function HomePage() {
+export default function Home() {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center">
-      <div className="mx-auto flex max-w-md flex-col items-center justify-center space-y-4 text-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-          <GraduationCap className="h-8 w-8 text-primary" />
-        </div>
-        <h1 className="text-3xl font-bold">Welcome to Campus Care</h1>
-        <p className="text-muted-foreground">A comprehensive platform for students to manage their academic journey.</p>
-        <Button asChild size="lg">
-          <Link href="/dashboard">Go to Dashboard</Link>
-        </Button>
-      </div>
+    <div className="min-h-screen flex flex-col">
+      <SiteHeader />
+      <main className="flex-1">
+        <HeroSection />
+        <FeaturesSection />
+        <TestimonialsSection />
+        <FaqSection />
+        <CtaSection />
+      </main>
+      <SiteFooter />
     </div>
   )
 }
