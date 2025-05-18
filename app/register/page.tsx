@@ -1,74 +1,145 @@
+"use client"
+
+import type React from "react"
+
+import { useState } from "react"
+import { useUser } from "@/contexts/user-context"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Checkbox } from "@/components/ui/checkbox"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { SiteHeader } from "@/components/site-header"
+import { SiteFooter } from "@/components/site-footer"
 import Link from "next/link"
+import { motion } from "framer-motion"
+import { Loader2 } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
 
-export default function Register() {
+export default function RegisterPage() {
+  const { register, isLoading } = useUser()
+  const [name, setName] = useState("")
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [agreedToTerms, setAgreedToTerms] = useState(false)
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    if (!agreedToTerms) {
+      alert("You must agree to the terms and conditions")
+      return
+    }
+
+    const formData = new FormData()
+    formData.append("name", name)
+    formData.append("email", email)
+    formData.append("password", password)
+    formData.append("confirmPassword", confirmPassword)
+    await register(formData)
+  }
+
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-muted/40">
-      <div className="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[350px]">
-        <div className="flex flex-col space-y-2 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight">Create an account</h1>
-          <p className="text-sm text-muted-foreground">Sign up to get started with Campus Care</p>
-        </div>
-        <Card>
-          <CardHeader className="space-y-1">
-            <CardTitle className="text-xl">Sign Up</CardTitle>
-            <CardDescription>Enter your information to create an account</CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="first-name">First name</Label>
-                <Input id="first-name" placeholder="John" />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="last-name">Last name</Label>
-                <Input id="last-name" placeholder="Doe" />
-              </div>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" placeholder="m@example.com" />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="confirm-password">Confirm Password</Label>
-              <Input id="confirm-password" type="password" />
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox id="terms" />
-              <label
-                htmlFor="terms"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-              >
-                I agree to the{" "}
-                <Link href="/terms" className="text-primary underline underline-offset-4">
-                  terms of service
-                </Link>{" "}
-                and{" "}
-                <Link href="/privacy" className="text-primary underline underline-offset-4">
-                  privacy policy
-                </Link>
-              </label>
-            </div>
-          </CardContent>
-          <CardFooter className="flex flex-col">
-            <Button className="w-full">Create Account</Button>
-            <div className="mt-4 text-center text-sm">
-              Already have an account?{" "}
-              <Link href="/login" className="underline underline-offset-4 hover:text-primary">
-                Sign in
-              </Link>
-            </div>
-          </CardFooter>
-        </Card>
-      </div>
+    <div className="min-h-screen flex flex-col">
+      <SiteHeader />
+      <main className="flex-1 flex items-center justify-center p-4 pt-20">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="w-full max-w-md"
+        >
+          <Card className="border-2">
+            <CardHeader className="space-y-1">
+              <CardTitle className="text-2xl font-bold text-center">Create an Account</CardTitle>
+              <CardDescription className="text-center">Enter your information to create an account</CardDescription>
+            </CardHeader>
+            <form onSubmit={handleSubmit}>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Full Name</Label>
+                  <Input
+                    id="name"
+                    placeholder="John Doe"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="your.email@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="confirmPassword">Confirm Password</Label>
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="terms"
+                    checked={agreedToTerms}
+                    onCheckedChange={(checked) => setAgreedToTerms(checked as boolean)}
+                  />
+                  <label
+                    htmlFor="terms"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    I agree to the{" "}
+                    <Link href="/terms" className="text-primary hover:underline">
+                      terms of service
+                    </Link>{" "}
+                    and{" "}
+                    <Link href="/privacy" className="text-primary hover:underline">
+                      privacy policy
+                    </Link>
+                  </label>
+                </div>
+              </CardContent>
+              <CardFooter className="flex flex-col space-y-4">
+                <Button type="submit" className="w-full" disabled={isLoading || !agreedToTerms}>
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Creating account...
+                    </>
+                  ) : (
+                    "Create Account"
+                  )}
+                </Button>
+                <div className="text-center text-sm">
+                  Already have an account?{" "}
+                  <Link href="/login" className="text-primary hover:underline">
+                    Login
+                  </Link>
+                </div>
+              </CardFooter>
+            </form>
+          </Card>
+        </motion.div>
+      </main>
+      <SiteFooter />
     </div>
   )
 }

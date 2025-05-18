@@ -5,16 +5,28 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
-import { MoonIcon, SunIcon, Menu, X } from "lucide-react"
+import { MoonIcon, SunIcon, Menu, X, ShoppingCart, User, LogOut, Bell } from "lucide-react"
 import { useTheme } from "next-themes"
 import { cn } from "@/lib/utils"
+import { useUser } from "@/contexts/user-context"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Badge } from "@/components/ui/badge"
 
 export function SiteHeader() {
   const pathname = usePathname()
   const { theme, setTheme } = useTheme()
+  const { user, isAuthenticated, logout } = useUser()
   const [mounted, setMounted] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
+  const [cartItemCount, setCartItemCount] = useState(0)
 
   // Handle scroll effect
   useEffect(() => {
@@ -30,13 +42,21 @@ export function SiteHeader() {
     setMounted(true)
   }, [])
 
+  // Simulate cart data
+  useEffect(() => {
+    if (isAuthenticated) {
+      // For demo purposes, set a random cart item count
+      setCartItemCount(Math.floor(Math.random() * 5))
+    }
+  }, [isAuthenticated])
+
   const navItems = [
     { href: "/dashboard", label: "Dashboard" },
     { href: "/diet", label: "Diet" },
     { href: "/marketplace", label: "Marketplace" },
     { href: "/learning", label: "Learning" },
     { href: "/tools", label: "Tools" },
-    { href: "/ai-assistant", label: "AI Assistant" },
+    { href: "/assistant", label: "AI Assistant" },
   ]
 
   return (
@@ -89,6 +109,7 @@ export function SiteHeader() {
         </nav>
 
         <div className="flex items-center space-x-4">
+          {/* Theme Toggle */}
           {mounted && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
               <Button
@@ -103,16 +124,66 @@ export function SiteHeader() {
             </motion.div>
           )}
 
-          <div className="hidden md:flex space-x-2">
-            <Link href="/login">
-              <Button variant="outline" size="sm">
-                Login
+          {/* Cart Button (only for logged in users) */}
+          {isAuthenticated && (
+            <Link href="/cart">
+              <Button variant="ghost" size="icon" className="rounded-full relative">
+                <ShoppingCart className="h-5 w-5" />
+                {cartItemCount > 0 && (
+                  <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0">
+                    {cartItemCount}
+                  </Badge>
+                )}
               </Button>
             </Link>
-            <Link href="/register">
-              <Button size="sm">Sign Up</Button>
-            </Link>
-          </div>
+          )}
+
+          {/* Notifications (only for logged in users) */}
+          {isAuthenticated && (
+            <Button variant="ghost" size="icon" className="rounded-full">
+              <Bell className="h-5 w-5" />
+            </Button>
+          )}
+
+          {/* User Menu or Login/Register */}
+          {isAuthenticated ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="rounded-full">
+                  <User className="h-5 w-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Hi, {user?.name}</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <Link href="/profile">
+                  <DropdownMenuItem>Profile</DropdownMenuItem>
+                </Link>
+                <Link href="/dashboard">
+                  <DropdownMenuItem>Dashboard</DropdownMenuItem>
+                </Link>
+                <Link href="/orders">
+                  <DropdownMenuItem>My Orders</DropdownMenuItem>
+                </Link>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => logout()}>
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Logout
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <div className="hidden md:flex space-x-2">
+              <Link href="/login">
+                <Button variant="outline" size="sm">
+                  Login
+                </Button>
+              </Link>
+              <Link href="/register">
+                <Button size="sm">Sign Up</Button>
+              </Link>
+            </div>
+          )}
 
           <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
             {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
@@ -144,16 +215,23 @@ export function SiteHeader() {
                   {item.label}
                 </Link>
               ))}
-              <div className="flex space-x-2 pt-2">
-                <Link href="/login" className="flex-1">
-                  <Button variant="outline" className="w-full">
-                    Login
-                  </Button>
-                </Link>
-                <Link href="/register" className="flex-1">
-                  <Button className="w-full">Sign Up</Button>
-                </Link>
-              </div>
+              {!isAuthenticated ? (
+                <div className="flex space-x-2 pt-2">
+                  <Link href="/login" className="flex-1">
+                    <Button variant="outline" className="w-full">
+                      Login
+                    </Button>
+                  </Link>
+                  <Link href="/register" className="flex-1">
+                    <Button className="w-full">Sign Up</Button>
+                  </Link>
+                </div>
+              ) : (
+                <Button variant="outline" onClick={() => logout()}>
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Logout
+                </Button>
+              )}
             </div>
           </motion.div>
         )}

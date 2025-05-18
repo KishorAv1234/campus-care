@@ -3,6 +3,7 @@ import "@/app/globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { ToastProvider } from "@/components/toast-provider"
 import { Analytics } from "@/components/analytics"
+import { UserProvider } from "@/contexts/user-context"
 import type { Metadata } from "next"
 import { Suspense } from "react"
 
@@ -19,10 +20,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head />
       <body>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <Suspense>
-            {children}
-            <ToastProvider />
-          </Suspense>
+          <UserProvider>
+            <Suspense>
+              {children}
+              <ToastProvider />
+            </Suspense>
+          </UserProvider>
         </ThemeProvider>
         <Analytics />
       </body>
