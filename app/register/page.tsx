@@ -3,58 +3,85 @@
 import type React from "react"
 
 import { useState } from "react"
-import { useUser } from "@/contexts/user-context"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { SiteHeader } from "@/components/site-header"
+import { SiteFooter } from "@/components/site-footer"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { SiteHeader } from "@/components/site-header"
-import { SiteFooter } from "@/components/site-footer"
-import Link from "next/link"
+import { useToast } from "@/hooks/use-toast"
+import { useUser } from "@/contexts/user-context"
 import { motion } from "framer-motion"
-import { Loader2 } from "lucide-react"
-import { Checkbox } from "@/components/ui/checkbox"
 
 export default function RegisterPage() {
-  const { register, isLoading } = useUser()
+  const router = useRouter()
+  const { toast } = useToast()
+  const { register } = useUser()
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
-  const [agreedToTerms, setAgreedToTerms] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!agreedToTerms) {
-      alert("You must agree to the terms and conditions")
+    setIsLoading(true)
+
+    if (password !== confirmPassword) {
+      toast({
+        title: "Error",
+        description: "Passwords do not match",
+        variant: "destructive",
+      })
+      setIsLoading(false)
       return
     }
 
-    const formData = new FormData()
-    formData.append("name", name)
-    formData.append("email", email)
-    formData.append("password", password)
-    formData.append("confirmPassword", confirmPassword)
-    await register(formData)
+    try {
+      const result = await register(name, email, password)
+      if (result.success) {
+        toast({
+          title: "Success",
+          description: "Your account has been created successfully",
+        })
+        router.push("/")
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to create account",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
     <div className="min-h-screen flex flex-col">
       <SiteHeader />
-      <main className="flex-1 flex items-center justify-center p-4 pt-20">
+      <main className="flex-1 container py-6 pt-20 flex items-center justify-center">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
           className="w-full max-w-md"
         >
-          <Card className="border-2">
+          <Card>
             <CardHeader className="space-y-1">
-              <CardTitle className="text-2xl font-bold text-center">Create an Account</CardTitle>
-              <CardDescription className="text-center">Enter your information to create an account</CardDescription>
+              <CardTitle className="text-2xl font-bold">Create an account</CardTitle>
+              <CardDescription>Enter your information to create an account</CardDescription>
             </CardHeader>
-            <form onSubmit={handleSubmit}>
-              <CardContent className="space-y-4">
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="name">Full Name</Label>
                   <Input
@@ -70,7 +97,7 @@ export default function RegisterPage() {
                   <Input
                     id="email"
                     type="email"
-                    placeholder="your.email@example.com"
+                    placeholder="john@example.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
@@ -87,55 +114,51 @@ export default function RegisterPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Confirm Password</Label>
+                  <Label htmlFor="confirm-password">Confirm Password</Label>
                   <Input
-                    id="confirmPassword"
+                    id="confirm-password"
                     type="password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     required
                   />
                 </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="terms"
-                    checked={agreedToTerms}
-                    onCheckedChange={(checked) => setAgreedToTerms(checked as boolean)}
-                  />
-                  <label
-                    htmlFor="terms"
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                  >
-                    I agree to the{" "}
-                    <Link href="/terms" className="text-primary hover:underline">
-                      terms of service
-                    </Link>{" "}
-                    and{" "}
-                    <Link href="/privacy" className="text-primary hover:underline">
-                      privacy policy
-                    </Link>
-                  </label>
-                </div>
-              </CardContent>
-              <CardFooter className="flex flex-col space-y-4">
-                <Button type="submit" className="w-full" disabled={isLoading || !agreedToTerms}>
+                <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <div className="flex items-center">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                       Creating account...
-                    </>
+                    </div>
                   ) : (
                     "Create Account"
                   )}
                 </Button>
-                <div className="text-center text-sm">
-                  Already have an account?{" "}
-                  <Link href="/login" className="text-primary hover:underline">
-                    Login
-                  </Link>
+              </form>
+            </CardContent>
+            <CardFooter className="flex flex-col space-y-4">
+              <div className="text-sm text-muted-foreground text-center">
+                Already have an account?{" "}
+                <Link href="/login" className="text-primary hover:underline">
+                  Login
+                </Link>
+              </div>
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
                 </div>
-              </CardFooter>
-            </form>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" className="w-full">
+                  Google
+                </Button>
+                <Button variant="outline" className="w-full">
+                  GitHub
+                </Button>
+              </div>
+            </CardFooter>
           </Card>
         </motion.div>
       </main>

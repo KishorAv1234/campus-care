@@ -1,105 +1,130 @@
 "use server"
 
-import { redirect } from "next/navigation"
 import { db } from "@/lib/db"
-import { createSession, destroySession, getCurrentUserId } from "@/lib/auth"
+import { cookies } from "next/headers"
+import { hash, compare } from "@/lib/auth"
 
-export async function login(formData: FormData) {
+export async function login(email: string, password: string) {
   try {
-    const email = formData.get("email") as string
-    const password = formData.get("password") as string
-
-    if (!email || !password) {
-      return { error: "Email and password are required" }
-    }
-
-    const user = db.findUserByEmail(email)
+    // In a real app, you would fetch the user from the database
+    // and verify the password
+    const user = await db.user.findUnique({
+      where: { email },
+    })
 
     if (!user) {
-      return { error: "Invalid email or password" }
+      return { success: false, error: "Invalid email or password" }
     }
 
-    // In a real app, we would verify the hashed password
-    // For now, we'll just compare directly since we're storing plaintext
-    // const passwordMatch = await verifyPassword(password, user.password);
-    const passwordMatch = password === user.password
-
+    const passwordMatch = await compare(password, user.password)
     if (!passwordMatch) {
-      return { error: "Invalid email or password" }
+      return { success: false, error: "Invalid email or password" }
     }
 
-    await createSession(user.id)
+    // Set a cookie or session
+    cookies().set("auth", "authenticated", { httpOnly: true, secure: process.env.NODE_ENV === "production" })
 
-    return { success: true, user: { id: user.id, name: user.name, email: user.email } }
+    return {
+      success: true,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+      },
+    }
   } catch (error) {
     console.error("Login error:", error)
-    return { error: "An unexpected error occurred. Please try again." }
+    return { success: false, error: "An unexpected error occurred" }
   }
 }
 
-export async function register(formData: FormData) {
+export async function register(name: string, email: string, password: string) {
   try {
-    const name = formData.get("name") as string
-    const email = formData.get("email") as string
-    const password = formData.get("password") as string
-    const confirmPassword = formData.get("confirmPassword") as string
+    // Check if user already exists
+    const existingUser = await db.user.findUnique({
+      where: { email },
+    })
 
-    if (!name || !email || !password) {
-      return { error: "All fields are required" }
-    }
-
-    if (password !== confirmPassword) {
-      return { error: "Passwords do not match" }
-    }
-
-    const existingUser = db.findUserByEmail(email)
     if (existingUser) {
-      return { error: "Email already in use" }
+      return { success: false, error: "Email already in use" }
     }
 
-    // In a real app, we would hash the password
-    // const hashedPassword = await hashPassword(password);
-    // const user = db.createUser({ name, email, password: hashedPassword });
-    const user = db.createUser({ name, email, password })
+    // Hash the password
+    const hashedPassword = await hash(password)
 
-    await createSession(user.id)
+    // Create the user
+    const user = await db.user.create({
+      data: {
+        name,
+        email,
+        password: hashedPassword,
+      },
+    })
 
-    return { success: true, user: { id: user.id, name: user.name, email: user.email } }
+    // Set a cookie or session
+    cookies().set("auth", "authenticated", { httpOnly: true, secure: process.env.NODE_ENV === "production" })
+
+    return {
+      success: true,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+      },
+    }
   } catch (error) {
     console.error("Registration error:", error)
-    return { error: "An unexpected error occurred. Please try again." }
+    return { success: false, error: "An unexpected error occurred" }
   }
 }
 
 export async function logout() {
   try {
-    destroySession()
-    redirect("/")
+    cookies().delete("auth")
+    return { success: true }
   } catch (error) {
     console.error("Logout error:", error)
-    redirect("/")
+    return { success: false, error: "An unexpected error occurred" }
   }
 }
 
-export async function getCurrentUser() {
+export async function updateUserProfile(userData: { name: string; email: string; phone?: string }) {
   try {
-    const userId = getCurrentUserId()
-    if (!userId) return null
-
-    const user = db.users.find((u) => u.id === userId)
-    if (!user) return null
-
-    return { id: user.id, name: user.name, email: user.email }
+    // In a real app, you would update the user in the database
+    // For now, we'll just return success
+    return { success: true }
   } catch (error) {
-    console.error("Get current user error:", error)
-    return null
+    console.error("Update profile error:", error)
+    return { success: false, error: "An unexpected error occurred" }
   }
 }
 
-export async function requireAuth() {
-  const user = await getCurrentUser()
-  if (!user) {
-    redirect("/login")
+export async function changePassword(passwordData: { currentPassword: string; newPassword: string }) {
+  try {
+    // In a real app, you would verify the current password and update with the new one
+    // For now, we'll just return success
+    return { success: true }
+  } catch (error) {
+    console.error("Change password error:", error)
+    return { success: false, error: "An unexpected error occurred" }
   }
-  return user
+}
+
+export async function getUserProfile() {
+  try {
+    // In a real app, you would fetch the user profile from the database
+    // For now, we'll return mock data
+    return {
+      success: true,
+      user: {
+        id: "1",
+        name: "John Doe",
+        email: "john@example.com",
+        phone: "+91 9876543210",
+      },
+    }
+  } catch (error) {
+    console.error("Get profile error:", error)
+    return { success: false, error: "An unexpected error occurred" }
+  }
 }

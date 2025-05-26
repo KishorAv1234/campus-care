@@ -6,24 +6,14 @@ import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { ShoppingCart, Trash2, CreditCard, QrCode, ArrowRight, BookOpen } from "lucide-react"
-import { motion } from "framer-motion"
-import { getUserCart, createOrder } from "@/app/actions/books"
+import { ShoppingCart, Trash2, ArrowRight, BookOpen, Minus, Plus } from "lucide-react"
+import { motion, AnimatePresence } from "framer-motion"
+import { getUserCart, createOrder, removeFromCart, updateCartItemQuantity } from "@/app/actions/books"
 import { useToast } from "@/hooks/use-toast"
-import { redirect } from "next/navigation"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Label } from "@/components/ui/label"
-import { Input } from "@/components/ui/input"
+import { PaymentMethods } from "@/components/payment-methods"
+import { Skeleton } from "@/components/ui/skeleton"
 
 type CartItem = {
   id: string
@@ -41,20 +31,25 @@ type Cart = {
 }
 
 export default function CartPage() {
-  const { user, isLoading } = useUser()
+  const { user, isLoading: isUserLoading } = useUser()
   const { toast } = useToast()
+  const router = useRouter()
   const [cart, setCart] = useState<Cart | null>(null)
   const [isPageLoading, setIsPageLoading] = useState(true)
-  const [paymentMethod, setPaymentMethod] = useState("upi")
   const [isProcessing, setIsProcessing] = useState(false)
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isCheckingOut, setIsCheckingOut] = useState(false)
 
   // Redirect if not logged in
   useEffect(() => {
-    if (!isLoading && !user) {
-      redirect("/login")
+    if (!isUserLoading && !user) {
+      toast({
+        title: "Login Required",
+        description: "Please login to view your cart",
+        variant: "destructive",
+      })
+      router.push("/login")
     }
-  }, [user, isLoading])
+  }, [user, isUserLoading, router, toast])
 
   // Fetch cart data
   useEffect(() => {
@@ -81,11 +76,63 @@ export default function CartPage() {
     }
   }, [user, toast])
 
-  const handleCheckout = async () => {
+  const handleRemoveItem = async (itemId: string) => {
+    try {
+      const result = await removeFromCart(itemId)
+      if (result.error) {
+        toast({
+          title: "Error",
+          description: result.error,
+          variant: "destructive",
+        })
+      } else {
+        setCart(result.cart)
+        toast({
+          title: "Item Removed",
+          description: "Item has been removed from your cart",
+        })
+      }
+    } catch (error) {
+      console.error("Error removing item:", error)
+      toast({
+        title: "Error",
+        description: "Failed to remove item. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleUpdateQuantity = async (itemId: string, quantity: number) => {
+    try {
+      const result = await updateCartItemQuantity(itemId, quantity)
+      if (result.error) {
+        toast({
+          title: "Error",
+          description: result.error,
+          variant: "destructive",
+        })
+      } else {
+        setCart(result.cart)
+      }
+    } catch (error) {
+      console.error("Error updating quantity:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update quantity. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleCheckout = () => {
+    setIsCheckingOut(true)
+  }
+
+  const handlePaymentComplete = async () => {
     setIsProcessing(true)
 
     try {
-      const result = await createOrder(paymentMethod)
+      const result = await createOrder("upi") // You can pass the actual payment method here
 
       if (result.error) {
         toast({
@@ -101,10 +148,10 @@ export default function CartPage() {
 
         // Clear cart
         setCart(null)
-        setIsDialogOpen(false)
+        setIsCheckingOut(false)
 
         // Redirect to orders page
-        redirect("/orders")
+        router.push("/orders")
       }
     } catch (error) {
       toast({
@@ -117,14 +164,68 @@ export default function CartPage() {
     }
   }
 
-  if (isLoading || isPageLoading) {
+  const handleCancelCheckout = () => {
+    setIsCheckingOut(false)
+  }
+
+  if (isUserLoading || isPageLoading) {
     return (
       <div className="min-h-screen flex flex-col">
         <SiteHeader />
-        <main className="flex-1 container py-6 pt-20 flex items-center justify-center">
-          <div className="flex flex-col items-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-            <p className="mt-4 text-muted-foreground">Loading your cart...</p>
+        <main className="flex-1 container py-6 pt-20">
+          <h1 className="text-3xl font-bold tracking-tight mb-6">Shopping Cart</h1>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2">
+              <Card>
+                <CardHeader>
+                  <Skeleton className="h-6 w-32" />
+                  <Skeleton className="h-4 w-48" />
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="flex items-center justify-between border-b pb-4 last:border-0 last:pb-0">
+                      <div className="flex items-center space-x-4">
+                        <Skeleton className="h-16 w-12 rounded" />
+                        <div>
+                          <Skeleton className="h-4 w-32 mb-2" />
+                          <Skeleton className="h-3 w-16" />
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-4">
+                        <Skeleton className="h-4 w-16" />
+                        <Skeleton className="h-8 w-8 rounded-full" />
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            </div>
+
+            <div>
+              <Card>
+                <CardHeader>
+                  <Skeleton className="h-6 w-32" />
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex justify-between">
+                    <Skeleton className="h-4 w-16" />
+                    <Skeleton className="h-4 w-16" />
+                  </div>
+                  <div className="flex justify-between">
+                    <Skeleton className="h-4 w-16" />
+                    <Skeleton className="h-4 w-16" />
+                  </div>
+                  <div className="border-t pt-4 flex justify-between">
+                    <Skeleton className="h-5 w-20" />
+                    <Skeleton className="h-5 w-20" />
+                  </div>
+                </CardContent>
+                <CardFooter>
+                  <Skeleton className="h-10 w-full" />
+                </CardFooter>
+              </Card>
+            </div>
           </div>
         </main>
         <SiteFooter />
@@ -136,12 +237,28 @@ export default function CartPage() {
     <div className="min-h-screen flex flex-col">
       <SiteHeader />
       <main className="flex-1 container py-6 pt-20">
-        <div className="flex flex-col gap-4 md:gap-8">
-          <div className="flex items-center justify-between">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+          <div className="flex items-center justify-between mb-6">
             <h1 className="text-3xl font-bold tracking-tight">Shopping Cart</h1>
+            {cart?.items.length > 0 && !isCheckingOut && (
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/marketplace">Continue Shopping</Link>
+              </Button>
+            )}
           </div>
 
-          {cart && cart.items.length > 0 ? (
+          {isCheckingOut && cart ? (
+            <div className="max-w-2xl mx-auto">
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+                <PaymentMethods
+                  total={cart.total}
+                  onPaymentComplete={handlePaymentComplete}
+                  onCancel={handleCancelCheckout}
+                  isProcessing={isProcessing}
+                />
+              </motion.div>
+            </div>
+          ) : cart && cart.items.length > 0 ? (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               <div className="lg:col-span-2">
                 <Card>
@@ -152,37 +269,66 @@ export default function CartPage() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {cart.items.map((item, index) => (
-                      <motion.div
-                        key={item.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.3, delay: index * 0.1 }}
-                        className="flex items-center justify-between border-b pb-4 last:border-0 last:pb-0"
-                      >
-                        <div className="flex items-center space-x-4">
-                          <div className="h-16 w-12 bg-muted rounded flex items-center justify-center">
-                            <BookOpen className="h-6 w-6 text-muted-foreground" />
+                    <AnimatePresence>
+                      {cart.items.map((item, index) => (
+                        <motion.div
+                          key={item.id}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+                          transition={{ duration: 0.3, delay: index * 0.1 }}
+                          className="flex items-center justify-between border-b pb-4 last:border-0 last:pb-0"
+                        >
+                          <div className="flex items-center space-x-4">
+                            <div className="h-16 w-12 bg-muted rounded flex items-center justify-center">
+                              <BookOpen className="h-6 w-6 text-muted-foreground" />
+                            </div>
+                            <div>
+                              <Link href={`/marketplace/${item.bookId}`} className="font-medium hover:underline">
+                                {item.title}
+                              </Link>
+                              <div className="flex items-center mt-1">
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-6 w-6 rounded-full"
+                                  onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}
+                                  disabled={item.quantity <= 1}
+                                >
+                                  <Minus className="h-3 w-3" />
+                                </Button>
+                                <span className="mx-2 text-sm">{item.quantity}</span>
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-6 w-6 rounded-full"
+                                  onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
+                                >
+                                  <Plus className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            </div>
                           </div>
-                          <div>
-                            <p className="font-medium">{item.title}</p>
-                            <p className="text-sm text-muted-foreground">Qty: {item.quantity}</p>
+                          <div className="flex items-center space-x-4">
+                            <p className="font-medium">₹{item.price * item.quantity}</p>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleRemoveItem(item.id)}
+                              className="text-muted-foreground hover:text-red-500 transition-colors"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           </div>
-                        </div>
-                        <div className="flex items-center space-x-4">
-                          <p className="font-medium">₹{item.price * item.quantity}</p>
-                          <Button variant="ghost" size="icon">
-                            <Trash2 className="h-4 w-4 text-muted-foreground" />
-                          </Button>
-                        </div>
-                      </motion.div>
-                    ))}
+                        </motion.div>
+                      ))}
+                    </AnimatePresence>
                   </CardContent>
                 </Card>
               </div>
 
               <div>
-                <Card>
+                <Card className="sticky top-24">
                   <CardHeader>
                     <CardTitle>Order Summary</CardTitle>
                   </CardHeader>
@@ -195,84 +341,20 @@ export default function CartPage() {
                       <span>Taxes</span>
                       <span>₹0</span>
                     </div>
+                    <div className="flex justify-between">
+                      <span>Shipping</span>
+                      <span>₹0</span>
+                    </div>
                     <div className="border-t pt-4 flex justify-between font-bold">
                       <span>Total</span>
                       <span>₹{cart.total}</span>
                     </div>
                   </CardContent>
                   <CardFooter>
-                    <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                      <DialogTrigger asChild>
-                        <Button className="w-full">
-                          Proceed to Checkout
-                          <ArrowRight className="ml-2 h-4 w-4" />
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Checkout</DialogTitle>
-                          <DialogDescription>Choose your payment method to complete your purchase.</DialogDescription>
-                        </DialogHeader>
-                        <div className="py-4">
-                          <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod} className="space-y-4">
-                            <div className="flex items-center space-x-2 border rounded-md p-4">
-                              <RadioGroupItem value="upi" id="upi" />
-                              <Label htmlFor="upi" className="flex items-center">
-                                <QrCode className="h-5 w-5 mr-2" />
-                                UPI Payment
-                              </Label>
-                            </div>
-                            {paymentMethod === "upi" && (
-                              <div className="ml-6 space-y-4">
-                                <div className="flex justify-center">
-                                  <div className="h-48 w-48 bg-muted rounded-md flex items-center justify-center">
-                                    <QrCode className="h-24 w-24 text-muted-foreground" />
-                                  </div>
-                                </div>
-                                <div className="text-center">
-                                  <p className="text-sm font-medium">Scan with any UPI app</p>
-                                  <p className="text-xs text-muted-foreground">campus.care@ybl</p>
-                                </div>
-                              </div>
-                            )}
-                            <div className="flex items-center space-x-2 border rounded-md p-4">
-                              <RadioGroupItem value="card" id="card" />
-                              <Label htmlFor="card" className="flex items-center">
-                                <CreditCard className="h-5 w-5 mr-2" />
-                                Credit/Debit Card
-                              </Label>
-                            </div>
-                            {paymentMethod === "card" && (
-                              <div className="ml-6 space-y-4">
-                                <div className="space-y-2">
-                                  <Label htmlFor="card-number">Card Number</Label>
-                                  <Input id="card-number" placeholder="1234 5678 9012 3456" />
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                  <div className="space-y-2">
-                                    <Label htmlFor="expiry">Expiry Date</Label>
-                                    <Input id="expiry" placeholder="MM/YY" />
-                                  </div>
-                                  <div className="space-y-2">
-                                    <Label htmlFor="cvv">CVV</Label>
-                                    <Input id="cvv" placeholder="123" />
-                                  </div>
-                                </div>
-                                <div className="space-y-2">
-                                  <Label htmlFor="name">Name on Card</Label>
-                                  <Input id="name" placeholder="John Doe" />
-                                </div>
-                              </div>
-                            )}
-                          </RadioGroup>
-                        </div>
-                        <DialogFooter>
-                          <Button onClick={handleCheckout} disabled={isProcessing}>
-                            {isProcessing ? "Processing..." : `Pay ₹${cart.total}`}
-                          </Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
+                    <Button className="w-full" onClick={handleCheckout}>
+                      Proceed to Checkout
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
                   </CardFooter>
                 </Card>
               </div>
@@ -302,7 +384,7 @@ export default function CartPage() {
               </motion.div>
             </div>
           )}
-        </div>
+        </motion.div>
       </main>
       <SiteFooter />
     </div>

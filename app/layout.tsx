@@ -1,33 +1,31 @@
 import type React from "react"
-import "@/app/globals.css"
-import { ThemeProvider } from "@/components/theme-provider"
-import { ToastProvider } from "@/components/toast-provider"
-import { Analytics } from "@/components/analytics"
-import { UserProvider } from "@/contexts/user-context"
 import type { Metadata } from "next"
-import { Suspense } from "react"
+import { Inter } from "next/font/google"
+import "./globals.css"
+import { UserProvider } from "@/contexts/user-context"
+import { Toaster } from "@/components/ui/toaster"
+
+const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "campus.care - Student Success Platform",
-  description: "Your all-in-one platform for student success, wellness, and productivity.",
-  metadataBase: new URL("https://campus.care"),
+  title: "Campus.Care - Your Complete Campus Companion",
+  description:
+    "Access study materials, manage events, plan your diet, and connect with fellow students - all in one place.",
     generator: 'v0.dev'
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <head />
-      <body>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <UserProvider>
-            <Suspense>
-              {children}
-              <ToastProvider />
-            </Suspense>
-          </UserProvider>
-        </ThemeProvider>
-        <Analytics />
+    <html lang="en">
+      <body className={inter.className}>
+        <UserProvider>
+          {children}
+          <Toaster />
+        </UserProvider>
       </body>
     </html>
   )

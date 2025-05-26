@@ -8,11 +8,11 @@ import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { Search, Filter, BookOpen, FileText, Star, Upload, Download, ShoppingCart } from "lucide-react"
-import { motion } from "framer-motion"
+import { Skeleton } from "@/components/ui/skeleton"
+import { BookOpen, FileText, Star, Upload, Download, ShoppingCart, BookMarked } from "lucide-react"
+import { motion, AnimatePresence } from "framer-motion"
 import {
   Dialog,
   DialogContent,
@@ -24,10 +24,13 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useToast } from "@/hooks/use-toast"
+import { SearchFilter } from "@/components/search-filter"
 import { getAllBooks, getFreeBooks, getBooksByCategory, searchBooks, uploadBook, addToCart } from "@/app/actions/books"
+import Link from "next/link"
 
 type Book = {
   id: string
@@ -53,6 +56,7 @@ export default function Marketplace() {
   const [activeTab, setActiveTab] = useState("all")
   const [isUploading, setIsUploading] = useState(false)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
 
   // Form states
   const [title, setTitle] = useState("")
@@ -62,20 +66,40 @@ export default function Marketplace() {
   const [category, setCategory] = useState("")
   const [isFree, setIsFree] = useState(false)
 
+  // Add these state variables at the top of the component
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [selectedCover, setSelectedCover] = useState<File | null>(null)
+  const [filePreview, setFilePreview] = useState<string>("")
+  const [coverPreview, setCoverPreview] = useState<string>("")
+
   // Fetch books
   useEffect(() => {
     const fetchBooks = async () => {
-      const allBooks = await getAllBooks()
-      setBooks(allBooks)
-      setFilteredBooks(allBooks)
+      setIsLoading(true)
+      try {
+        const allBooks = await getAllBooks()
+        setBooks(allBooks)
+        setFilteredBooks(allBooks)
+      } catch (error) {
+        console.error("Error fetching books:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load books. Please try again.",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
     }
 
     fetchBooks()
-  }, [])
+  }, [toast])
 
   // Handle search
-  const handleSearch = async () => {
-    if (!searchQuery.trim()) {
+  const handleSearch = async (query: string) => {
+    setSearchQuery(query)
+
+    if (!query.trim()) {
       // If search is empty, reset to all books or current category/tab
       if (activeTab === "free") {
         const freeBooks = await getFreeBooks()
@@ -89,51 +113,142 @@ export default function Marketplace() {
       return
     }
 
-    const results = await searchBooks(searchQuery)
-    setFilteredBooks(results)
+    setIsLoading(true)
+    try {
+      const results = await searchBooks(query)
+      setFilteredBooks(results)
+    } catch (error) {
+      console.error("Error searching books:", error)
+      toast({
+        title: "Error",
+        description: "Failed to search books. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Handle filter
+  const handleFilter = async (filters: any) => {
+    setIsLoading(true)
+    try {
+      let filtered = [...books]
+
+      // Filter by price range
+      if (filters.priceRange) {
+        filtered = filtered.filter((book) => book.price >= filters.priceRange[0] && book.price <= filters.priceRange[1])
+      }
+
+      // Filter by categories
+      if (filters.categories && filters.categories.length > 0) {
+        filtered = filtered.filter((book) => filters.categories.includes(book.category))
+      }
+
+      // Filter free only
+      if (filters.freeOnly) {
+        filtered = filtered.filter((book) => book.isFree)
+      }
+
+      // Sort
+      if (filters.sortBy) {
+        switch (filters.sortBy) {
+          case "price-low":
+            filtered.sort((a, b) => a.price - b.price)
+            break
+          case "price-high":
+            filtered.sort((a, b) => b.price - a.price)
+            break
+          case "newest":
+            filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+            break
+          // Add more sorting options as needed
+        }
+      }
+
+      setFilteredBooks(filtered)
+
+      toast({
+        title: "Filters Applied",
+        description: `Showing ${filtered.length} results`,
+      })
+    } catch (error) {
+      console.error("Error applying filters:", error)
+      toast({
+        title: "Error",
+        description: "Failed to apply filters. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   // Handle category change
   const handleCategoryChange = async (category: string) => {
     setSelectedCategory(category)
+    setIsLoading(true)
 
-    if (category === "all") {
-      if (activeTab === "free") {
-        const freeBooks = await getFreeBooks()
-        setFilteredBooks(freeBooks)
+    try {
+      if (category === "all") {
+        if (activeTab === "free") {
+          const freeBooks = await getFreeBooks()
+          setFilteredBooks(freeBooks)
+        } else {
+          setFilteredBooks(books)
+        }
       } else {
-        setFilteredBooks(books)
-      }
-    } else {
-      const categoryBooks = await getBooksByCategory(category)
+        const categoryBooks = await getBooksByCategory(category)
 
-      if (activeTab === "free") {
-        setFilteredBooks(categoryBooks.filter((book) => book.isFree))
-      } else {
-        setFilteredBooks(categoryBooks)
+        if (activeTab === "free") {
+          setFilteredBooks(categoryBooks.filter((book) => book.isFree))
+        } else {
+          setFilteredBooks(categoryBooks)
+        }
       }
+    } catch (error) {
+      console.error("Error changing category:", error)
+      toast({
+        title: "Error",
+        description: "Failed to filter by category. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
     }
   }
 
   // Handle tab change
   const handleTabChange = async (tab: string) => {
     setActiveTab(tab)
+    setIsLoading(true)
 
-    if (tab === "free") {
-      const freeBooks = await getFreeBooks()
+    try {
+      if (tab === "free") {
+        const freeBooks = await getFreeBooks()
 
-      if (selectedCategory !== "all") {
-        setFilteredBooks(freeBooks.filter((book) => book.category === selectedCategory))
+        if (selectedCategory !== "all") {
+          setFilteredBooks(freeBooks.filter((book) => book.category === selectedCategory))
+        } else {
+          setFilteredBooks(freeBooks)
+        }
       } else {
-        setFilteredBooks(freeBooks)
+        if (selectedCategory !== "all") {
+          const categoryBooks = await getBooksByCategory(selectedCategory)
+          setFilteredBooks(categoryBooks)
+        } else {
+          setFilteredBooks(books)
+        }
       }
-    } else {
-      if (selectedCategory !== "all") {
-        const categoryBooks = await getBooksByCategory(selectedCategory)
-        setFilteredBooks(categoryBooks)
-      } else {
-        setFilteredBooks(books)
-      }
+    } catch (error) {
+      console.error("Error changing tab:", error)
+      toast({
+        title: "Error",
+        description: "Failed to filter books. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -150,6 +265,26 @@ export default function Marketplace() {
       formData.append("price", price)
       formData.append("category", category)
       formData.append("isFree", isFree.toString())
+
+      // Get file inputs
+      const fileInput = document.getElementById("file") as HTMLInputElement
+      const coverInput = document.getElementById("cover") as HTMLInputElement
+
+      if (fileInput?.files?.[0]) {
+        formData.append("file", fileInput.files[0])
+      } else {
+        toast({
+          title: "Error",
+          description: "Please select a file to upload",
+          variant: "destructive",
+        })
+        setIsUploading(false)
+        return
+      }
+
+      if (coverInput?.files?.[0]) {
+        formData.append("cover", coverInput.files[0])
+      }
 
       const result = await uploadBook(formData)
 
@@ -179,12 +314,7 @@ export default function Marketplace() {
         }
 
         // Reset form
-        setTitle("")
-        setAuthor("")
-        setDescription("")
-        setPrice("")
-        setCategory("")
-        setIsFree(false)
+        resetForm()
         setIsDialogOpen(false)
       }
     } catch (error) {
@@ -209,20 +339,70 @@ export default function Marketplace() {
       return
     }
 
-    const result = await addToCart(bookId)
+    try {
+      const result = await addToCart(bookId)
 
-    if (result.error) {
+      if (result.error) {
+        toast({
+          title: "Error",
+          description: result.error,
+          variant: "destructive",
+        })
+      } else if (result.success) {
+        toast({
+          title: "Success",
+          description: "Item added to cart!",
+        })
+      }
+    } catch (error) {
+      console.error("Error adding to cart:", error)
       toast({
         title: "Error",
-        description: result.error,
+        description: "Failed to add item to cart. Please try again.",
         variant: "destructive",
       })
-    } else if (result.success) {
-      toast({
-        title: "Success",
-        description: "Item added to cart!",
-      })
     }
+  }
+
+  // Add these handler functions
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setSelectedFile(file)
+      setFilePreview(file.name)
+    }
+  }
+
+  const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setSelectedCover(file)
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        setCoverPreview(e.target?.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  // Update the resetForm function to include file resets
+  const resetForm = () => {
+    setTitle("")
+    setAuthor("")
+    setDescription("")
+    setPrice("")
+    setCategory("")
+    setIsFree(false)
+    setSelectedFile(null)
+    setSelectedCover(null)
+    setFilePreview("")
+    setCoverPreview("")
+
+    // Reset file inputs
+    const fileInput = document.getElementById("file") as HTMLInputElement
+    const coverInput = document.getElementById("cover") as HTMLInputElement
+    if (fileInput) fileInput.value = ""
+    if (coverInput) coverInput.value = ""
   }
 
   const categories = [
@@ -242,7 +422,12 @@ export default function Marketplace() {
     <div className="min-h-screen flex flex-col">
       <SiteHeader />
       <main className="flex-1 container py-6 pt-20">
-        <div className="flex flex-col gap-4 md:gap-8">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="flex flex-col gap-4 md:gap-8"
+        >
           <div className="flex items-center justify-between">
             <h1 className="text-3xl font-bold tracking-tight">Student Marketplace</h1>
             <div className="flex items-center gap-2">
@@ -338,21 +523,50 @@ export default function Marketplace() {
                         </label>
                       </div>
                       <div className="grid gap-2">
-                        <Label htmlFor="file">Upload File</Label>
-                        <Input id="file" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx" required />
+                        <Label htmlFor="file">Upload File *</Label>
+                        <Input
+                          id="file"
+                          type="file"
+                          accept=".pdf,.doc,.docx,.ppt,.pptx"
+                          required
+                          onChange={handleFileChange}
+                        />
+                        {selectedFile && (
+                          <div className="text-sm text-green-600 flex items-center gap-2">
+                            <FileText className="h-4 w-4" />
+                            {selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
+                          </div>
+                        )}
                         <p className="text-xs text-muted-foreground">
                           Supported formats: PDF, DOC, DOCX, PPT, PPTX (Max 50MB)
                         </p>
                       </div>
+
                       <div className="grid gap-2">
                         <Label htmlFor="cover">Cover Image (Optional)</Label>
-                        <Input id="cover" type="file" accept="image/*" />
+                        <Input id="cover" type="file" accept="image/*" onChange={handleCoverChange} />
+                        {coverPreview && (
+                          <div className="mt-2">
+                            <img
+                              src={coverPreview || "/placeholder.svg"}
+                              alt="Cover preview"
+                              className="w-20 h-24 object-cover rounded border"
+                            />
+                          </div>
+                        )}
                         <p className="text-xs text-muted-foreground">Supported formats: JPG, PNG, GIF (Max 5MB)</p>
                       </div>
                     </div>
                     <DialogFooter>
                       <Button type="submit" disabled={isUploading}>
-                        {isUploading ? "Uploading..." : "Upload Book"}
+                        {isUploading ? (
+                          <div className="flex items-center">
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                            Uploading...
+                          </div>
+                        ) : (
+                          "Upload Book"
+                        )}
                       </Button>
                     </DialogFooter>
                   </form>
@@ -361,36 +575,7 @@ export default function Marketplace() {
             </div>
           </div>
 
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search for books, notes, etc."
-                className="pl-10"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-              />
-            </div>
-            <div className="flex gap-2">
-              <Select value={selectedCategory} onValueChange={handleCategoryChange}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  {categories.map((cat) => (
-                    <SelectItem key={cat} value={cat}>
-                      {cat}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button variant="outline" size="icon" onClick={handleSearch}>
-                <Filter className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
+          <SearchFilter onSearch={handleSearch} onFilter={handleFilter} categories={categories} />
 
           <Tabs defaultValue="all" className="w-full" onValueChange={handleTabChange}>
             <TabsList className="grid w-full max-w-md grid-cols-2">
@@ -399,11 +584,34 @@ export default function Marketplace() {
             </TabsList>
 
             <TabsContent value="all" className="space-y-4">
-              {filteredBooks.length > 0 ? (
+              {isLoading ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {filteredBooks.map((book, index) => (
-                    <BookCard key={book.id} book={book} index={index} onAddToCart={handleAddToCart} />
+                  {[1, 2, 3, 4, 5, 6].map((i) => (
+                    <Card key={i} className="overflow-hidden">
+                      <div className="aspect-[3/4] w-full">
+                        <Skeleton className="h-full w-full" />
+                      </div>
+                      <CardContent className="p-4">
+                        <Skeleton className="h-4 w-3/4 mb-2" />
+                        <Skeleton className="h-3 w-1/2 mb-4" />
+                        <Skeleton className="h-3 w-full mb-2" />
+                        <Skeleton className="h-3 w-full mb-2" />
+                        <Skeleton className="h-3 w-2/3" />
+                      </CardContent>
+                      <CardFooter className="flex justify-between p-4">
+                        <Skeleton className="h-9 w-20" />
+                        <Skeleton className="h-9 w-24" />
+                      </CardFooter>
+                    </Card>
                   ))}
+                </div>
+              ) : filteredBooks.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <AnimatePresence>
+                    {filteredBooks.map((book, index) => (
+                      <BookCard key={book.id} book={book} index={index} onAddToCart={handleAddToCart} />
+                    ))}
+                  </AnimatePresence>
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center py-12">
@@ -423,11 +631,34 @@ export default function Marketplace() {
             </TabsContent>
 
             <TabsContent value="free" className="space-y-4">
-              {filteredBooks.length > 0 ? (
+              {isLoading ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {filteredBooks.map((book, index) => (
-                    <BookCard key={book.id} book={book} index={index} onAddToCart={handleAddToCart} />
+                  {[1, 2, 3, 4, 5, 6].map((i) => (
+                    <Card key={i} className="overflow-hidden">
+                      <div className="aspect-[3/4] w-full">
+                        <Skeleton className="h-full w-full" />
+                      </div>
+                      <CardContent className="p-4">
+                        <Skeleton className="h-4 w-3/4 mb-2" />
+                        <Skeleton className="h-3 w-1/2 mb-4" />
+                        <Skeleton className="h-3 w-full mb-2" />
+                        <Skeleton className="h-3 w-full mb-2" />
+                        <Skeleton className="h-3 w-2/3" />
+                      </CardContent>
+                      <CardFooter className="flex justify-between p-4">
+                        <Skeleton className="h-9 w-20" />
+                        <Skeleton className="h-9 w-24" />
+                      </CardFooter>
+                    </Card>
                   ))}
+                </div>
+              ) : filteredBooks.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <AnimatePresence>
+                    {filteredBooks.map((book, index) => (
+                      <BookCard key={book.id} book={book} index={index} onAddToCart={handleAddToCart} />
+                    ))}
+                  </AnimatePresence>
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center py-12">
@@ -490,7 +721,7 @@ export default function Marketplace() {
               </div>
             </CardContent>
           </Card>
-        </div>
+        </motion.div>
       </main>
       <SiteFooter />
     </div>
@@ -510,56 +741,76 @@ function BookCard({
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
       transition={{ duration: 0.3, delay: index * 0.05 }}
+      whileHover={{ y: -5 }}
+      className="h-full"
     >
-      <Card className="h-full flex flex-col">
-        <CardHeader className="pb-2">
-          <div className="flex justify-between items-start">
-            <div className="flex items-center space-x-2">
-              <div className="rounded-full w-8 h-8 flex items-center justify-center bg-primary/10">
-                {book.isFree ? <Download className="h-4 w-4" /> : <BookOpen className="h-4 w-4" />}
-              </div>
+      <Link href={`/marketplace/${book.id}`} className="h-full block">
+        <Card className="h-full flex flex-col overflow-hidden transition-all duration-300 hover:shadow-lg">
+          <div className="relative">
+            <div className="aspect-[3/4] w-full bg-muted overflow-hidden">
+              <img
+                src={book.coverImage || "/placeholder.svg?height=400&width=300"}
+                alt={book.title}
+                className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+              />
+            </div>
+            <Badge variant={book.isFree ? "secondary" : "outline"} className="absolute top-2 right-2">
+              {book.isFree ? "Free" : `₹${book.price}`}
+            </Badge>
+          </div>
+          <CardHeader className="pb-2">
+            <div className="flex items-start justify-between">
               <div>
-                <CardTitle className="text-base">{book.title}</CardTitle>
+                <CardTitle className="text-base line-clamp-1">{book.title}</CardTitle>
                 <div className="text-xs text-muted-foreground mt-1">by {book.author}</div>
               </div>
+              <div className="rounded-full w-8 h-8 flex items-center justify-center bg-primary/10">
+                {book.isFree ? <Download className="h-4 w-4" /> : <BookMarked className="h-4 w-4" />}
+              </div>
             </div>
-            <Badge variant={book.isFree ? "secondary" : "outline"}>{book.isFree ? "Free" : `₹${book.price}`}</Badge>
-          </div>
-        </CardHeader>
-        <CardContent className="flex-1">
-          <div className="aspect-[3/4] w-full bg-muted rounded-md mb-3 overflow-hidden">
-            <img
-              src={book.coverImage || "/placeholder.svg?height=400&width=300"}
-              alt={book.title}
-              className="w-full h-full object-cover"
-            />
-          </div>
-          <p className="text-sm text-muted-foreground line-clamp-3">{book.description}</p>
-          <div className="flex items-center mt-2">
-            <Badge variant="outline" className="mr-2">
-              {book.category}
-            </Badge>
-            <span className="text-xs text-muted-foreground">{new Date(book.createdAt).toLocaleDateString()}</span>
-          </div>
-        </CardContent>
-        <CardFooter className="flex justify-between">
-          <Button variant="outline" size="sm">
-            View Details
-          </Button>
-          {book.isFree ? (
-            <Button size="sm">
-              <Download className="mr-2 h-4 w-4" />
-              Download
+          </CardHeader>
+          <CardContent className="flex-1">
+            <p className="text-sm text-muted-foreground line-clamp-3">{book.description}</p>
+            <div className="flex items-center mt-2">
+              <Badge variant="outline" className="mr-2">
+                {book.category}
+              </Badge>
+              <span className="text-xs text-muted-foreground">{new Date(book.createdAt).toLocaleDateString()}</span>
+            </div>
+          </CardContent>
+          <CardFooter className="flex justify-between">
+            <Button variant="outline" size="sm" asChild>
+              <span>View Details</span>
             </Button>
-          ) : (
-            <Button size="sm" onClick={() => onAddToCart(book.id)}>
-              <ShoppingCart className="mr-2 h-4 w-4" />
-              Add to Cart
-            </Button>
-          )}
-        </CardFooter>
-      </Card>
+            {book.isFree ? (
+              <Button
+                size="sm"
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                }}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Download
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  onAddToCart(book.id)
+                }}
+              >
+                <ShoppingCart className="mr-2 h-4 w-4" />
+                Add to Cart
+              </Button>
+            )}
+          </CardFooter>
+        </Card>
+      </Link>
     </motion.div>
   )
 }
