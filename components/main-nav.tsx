@@ -11,6 +11,9 @@ const navItems = [
   { href: "/events", label: "Events" },
   { href: "/diet-plans", label: "Diet Plans" },
   { href: "/notes", label: "Notes" },
+  { href: "/goals", label: "Goals" },
+  { href: "/calendar", label: "Calendar" },
+  { href: "/pomodoro", label: "Pomodoro" },
 ]
 
 interface MainNavProps {
@@ -21,7 +24,7 @@ export function MainNav({ className }: MainNavProps) {
   const pathname = usePathname()
 
   return (
-    <nav className={cn("flex items-center space-x-6", className)}>
+    <nav className={cn("flex items-center space-x-4 lg:space-x-6", className)}>
       {navItems.map((item) => (
         <Link
           key={item.href}
