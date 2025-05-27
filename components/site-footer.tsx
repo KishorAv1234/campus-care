@@ -83,12 +83,12 @@ export function SiteFooter() {
               <li className="flex items-start space-x-3">
                 <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
                 <span className="text-sm text-muted-foreground">
-                  123 Campus Street, Education District, Delhi, India - 110001
+                  vvce mysore
                 </span>
               </li>
               <li className="flex items-center space-x-3">
                 <Phone className="h-5 w-5 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">+91 98765 43210</span>
+                <span className="text-sm text-muted-foreground">1234567890</span>
               </li>
               <li className="flex items-center space-x-3">
                 <Mail className="h-5 w-5 text-muted-foreground" />
