@@ -1,19 +1,50 @@
 "use client"
-
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
+import { LayoutDashboard, Calendar, Target, Clock, FileText, Utensils, Users, ShoppingCart } from "lucide-react"
 
-const navItems = [
-  { href: "/", label: "Home" },
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/marketplace", label: "Marketplace" },
-  { href: "/events", label: "Events" },
-  { href: "/diet-plans", label: "Diet Plans" },
-  { href: "/notes", label: "Notes" },
-  { href: "/goals", label: "Goals" },
-  { href: "/calendar", label: "Calendar" },
-  { href: "/pomodoro", label: "Pomodoro" },
+const navigation = [
+  {
+    name: "Dashboard",
+    href: "/dashboard",
+    icon: LayoutDashboard,
+  },
+  {
+    name: "Marketplace",
+    href: "/marketplace",
+    icon: ShoppingCart,
+  },
+  {
+    name: "Calendar",
+    href: "/calendar",
+    icon: Calendar,
+  },
+  {
+    name: "Goals",
+    href: "/goals",
+    icon: Target,
+  },
+  {
+    name: "Pomodoro",
+    href: "/pomodoro",
+    icon: Clock,
+  },
+  {
+    name: "Notes",
+    href: "/notes",
+    icon: FileText,
+  },
+  {
+    name: "Diet Plans",
+    href: "/diet-plans",
+    icon: Utensils,
+  },
+  {
+    name: "Events",
+    href: "/events",
+    icon: Users,
+  },
 ]
 
 interface MainNavProps {
@@ -25,18 +56,22 @@ export function MainNav({ className }: MainNavProps) {
 
   return (
     <nav className={cn("flex items-center space-x-4 lg:space-x-6", className)}>
-      {navItems.map((item) => (
-        <Link
-          key={item.href}
-          href={item.href}
-          className={cn(
-            "text-sm font-medium transition-colors hover:text-primary",
-            pathname === item.href ? "text-foreground" : "text-muted-foreground",
-          )}
-        >
-          {item.label}
-        </Link>
-      ))}
+      {navigation.map((item) => {
+        const Icon = item.icon
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={cn(
+              "flex items-center gap-2 text-sm font-medium transition-colors hover:text-primary",
+              pathname === item.href ? "text-black dark:text-white" : "text-muted-foreground",
+            )}
+          >
+            <Icon className="h-4 w-4" />
+            <span className="hidden md:inline-block">{item.name}</span>
+          </Link>
+        )
+      })}
     </nav>
   )
 }
